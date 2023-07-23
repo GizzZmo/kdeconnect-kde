@@ -54,18 +54,37 @@ public:
         notification->setTitle(QStringLiteral("KDE Connect"));
         notification->setText(
             i18n("Pairing request from %1\nKey: %2...", device->name().toHtmlEscaped(), QString::fromUtf8(device->verificationKey().left(8))));
-        notification->setDefaultAction(i18n("Open"));
-        notification->setActions(QStringList() << i18n("Accept") << i18n("Reject") << i18n("View key"));
-        connect(notification, &KNotification::action1Activated, device, &Device::acceptPairing);
-        connect(notification, &KNotification::action2Activated, device, &Device::cancelPairing);
         QString deviceId = device->id();
         auto openSettings = [deviceId, notification] {
             OpenConfig oc;
             oc.setXdgActivationToken(notification->xdgActivationToken());
             oc.openConfiguration(deviceId);
         };
+
+#if QT_VERSION_MAJOR == 6
+        KNotificationAction *openSettingsAction = new KNotificationAction(i18n("Open"));
+        connect(openSettingsAction, &KNotificationAction::activated, openSettings);
+        notification->setDefaultAction(openSettingsAction);
+
+        KNotificationAction *acceptAction = new KNotificationAction(i18n("Accept"));
+        connect(acceptAction, &KNotificationAction::activated, device, &Device::acceptPairing);
+
+        KNotificationAction *rejectAction = new KNotificationAction(i18n("Reject"));
+        connect(rejectAction, &KNotificationAction::activated, device, &Device::cancelPairing);
+
+        KNotificationAction *viewKeyAction = new KNotificationAction(i18n("View key"));
+        connect(viewKeyAction, &KNotificationAction::activated, openSettings);
+
+        notification->setActions({acceptAction, rejectAction, viewKeyAction});
+#else
+        notification->setDefaultAction(i18n("Open"));
+        notification->setActions(QStringList() << i18n("Accept") << i18n("Reject") << i18n("View key"));
+        connect(notification, &KNotification::action1Activated, device, &Device::acceptPairing);
+        connect(notification, &KNotification::action2Activated, device, &Device::cancelPairing);
         connect(notification, &KNotification::action3Activated, openSettings);
         connect(notification, &KNotification::activated, openSettings);
+#endif
+
         notification->sendEvent();
     }
 

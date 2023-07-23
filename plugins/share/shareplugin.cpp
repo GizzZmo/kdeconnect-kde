@@ -160,15 +160,8 @@ bool SharePlugin::receivePacket(const NetworkPacket &np)
         notif->setComponentName(QStringLiteral("kdeconnect"));
         notif->setText(text);
         notif->setTitle(i18nc("@info Some piece of text was received from a connected device", "Shared text from %1 copied to clipboard", device()->name()));
-        QStringList actions;
-        actions << i18nc("@action:button Edit text with default text editor", "Open in Text Editor");
-        if (url.isValid() && (url.scheme() == QStringLiteral("http") || url.scheme() == QStringLiteral("https"))) {
-            qDebug() << url;
-            actions << i18nc("@action:button Open URL with default app", "Open Link");
-        }
-        notif->setActions(actions);
 
-        connect(notif, &KNotification::action1Activated, this, [this, text]() {
+        auto openTextEditor = [this, text] {
             KService::Ptr service = KApplicationTrader::preferredService(QStringLiteral("text/plain"));
             const QString defaultApp = service ? service->desktopEntryName() : QString();
 
@@ -190,13 +183,42 @@ bool SharePlugin::receivePacket(const NetworkPacket &np)
                 QDesktopServices::openUrl(QUrl::fromLocalFile(fileName));
                 Q_EMIT shareReceived(fileName);
             }
-        });
+        };
+
+#if QT_VERSION_MAJOR == 6
+        QList<KNotificationAction *> actions;
+
+        KNotificationAction *textEditorAction = new KNotificationAction(i18nc("@action:button Edit text with default text editor", "Open in Text Editor"));
+        connect(textEditorAction, &KNotificationAction::activated, this, openTextEditor);
+
+        actions << textEditorAction;
+
+        if (url.isValid() && (url.scheme() == QStringLiteral("http") || url.scheme() == QStringLiteral("https"))) {
+            KNotificationAction *openLinkAction = new KNotificationAction(i18nc("@action:button Open URL with default app", "Open Link"));
+            connect(openLinkAction, &KNotificationAction::activated, this, [this, url] {
+                QDesktopServices::openUrl(url);
+                Q_EMIT shareReceived(url.toString());
+            });
+
+            actions << openLinkAction;
+        }
+#else
+        QStringList actions;
+        actions << i18nc("@action:button Edit text with default text editor", "Open in Text Editor");
+        if (url.isValid() && (url.scheme() == QStringLiteral("http") || url.scheme() == QStringLiteral("https"))) {
+            qDebug() << url;
+            actions << i18nc("@action:button Open URL with default app", "Open Link");
+        }
+
+        connect(notif, &KNotification::action1Activated, this, openTextEditor);
 
         connect(notif, &KNotification::action2Activated, this, [this, url]() {
             QDesktopServices::openUrl(url);
             Q_EMIT shareReceived(url.toString());
         });
+#endif
 
+        notif->setActions(actions);
         notif->sendEvent();
 
     } else if (np.has(QStringLiteral("url"))) {
