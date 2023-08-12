@@ -182,12 +182,20 @@ int Discoverer::listenForQueryResponses()
                 qCDebug(KDECONNECT_CORE) << "Opening socket for address" << sourceAddress;
                 struct sockaddr_in saddr = qHostAddressToSockaddr(sourceAddress);
                 int socket = mdns_socket_open_ipv4(&saddr);
-                sockets.append(socket);
+                if (socket >= 0) {
+                    sockets.append(socket);
+                } else {
+                    qCDebug(KDECONNECT_CORE) << "Couldn't open socket";
+                }
             } else if (sourceAddress.protocol() == QAbstractSocket::IPv6Protocol && sourceAddress != QHostAddress::LocalHostIPv6) {
                 qCDebug(KDECONNECT_CORE) << "Opening socket for address6" << sourceAddress;
                 struct sockaddr_in6 saddr = qHostAddressToSockaddr6(sourceAddress);
                 int socket = mdns_socket_open_ipv6(&saddr);
-                sockets.append(socket);
+                if (socket >= 0) {
+                    sockets.append(socket);
+                } else {
+                    qCDebug(KDECONNECT_CORE) << "Couldn't open socket";
+                }
             }
         }
     }
